@@ -125,40 +125,41 @@ def adj_calculation(temp):
     adj_indicator = (adj_mat != 0).astype(float)
     return normalized_adjacency(adj_indicator)
 
-# === Feature Generation for Sparse Matrices ===
-datasets = ['rt', 'tp']
-percents = [5, 10, 15, 20]
-prev_time_steps = 8
-max_time_steps = 64
-sparse_path = './sparse_files/{}'  # Sparse .npz files like rt_5_t63.npz
-output_path = './data_files/{}'
-
-with tf.device('cpu'):
-    for dataset in datasets:
-        for percent in percents:
-            print(f"Working for {dataset}-{percent}%")
-            handcrafted_features, adj_norms = [], []
-            
-            for k in range(max_time_steps-prev_time_steps, max_time_steps):  # last prev_time_steps
-                temp_sparse = load_sparse_matrix(sparse_path.format(f'{dataset}_{percent}'), k)
-                temp = temp_sparse.toarray()
-
-                csm_user, csm_serv = similarity_feature(temp)
-                csm_user = user_train_and_test(csm_user)
-                csm_serv = serv_train_and_test(csm_serv)
-
-                user_stat, serv_stat = statistical_feature(temp)
-                user_svd, serv_svd = svd_feature(temp)
-
-                csm_feature = np.concatenate((csm_user, csm_serv), axis=0)
-                svd_feat = np.concatenate((user_svd, serv_svd), axis=0)
-                stat_feature = np.concatenate((user_stat, serv_stat), axis=0)
-
-                node_feature = np.concatenate((csm_feature, svd_feat, stat_feature), axis=1)
-                handcrafted_features.append(node_feature)
-
-                adj_norm = adj_calculation(temp)
-                adj_norms.append(adj_norm)
-
-            np.save(output_path.format(f'{dataset}_{percent}_handcrafted_features.npy'), handcrafted_features)
-            np.save(output_path.format(f'{dataset}_{percent}_adj_norm.npy'), adj_norms)
+def run_feature_generation():
+    # === Feature Generation for Sparse Matrices ===
+    datasets = ['rt', 'tp']
+    percents = [5, 10, 15, 20]
+    prev_time_steps = 8
+    max_time_steps = 64
+    sparse_path = './sparse_files/{}'  # Sparse .npz files like rt_5_t63.npz
+    output_path = './data_files/{}'
+    
+    with tf.device('cpu'):
+        for dataset in datasets:
+            for percent in percents:
+                print(f"Working for {dataset}-{percent}%")
+                handcrafted_features, adj_norms = [], []
+                
+                for k in range(max_time_steps-prev_time_steps, max_time_steps):  # last prev_time_steps
+                    temp_sparse = load_sparse_matrix(sparse_path.format(f'{dataset}_{percent}'), k)
+                    temp = temp_sparse.toarray()
+    
+                    csm_user, csm_serv = similarity_feature(temp)
+                    csm_user = user_train_and_test(csm_user)
+                    csm_serv = serv_train_and_test(csm_serv)
+    
+                    user_stat, serv_stat = statistical_feature(temp)
+                    user_svd, serv_svd = svd_feature(temp)
+    
+                    csm_feature = np.concatenate((csm_user, csm_serv), axis=0)
+                    svd_feat = np.concatenate((user_svd, serv_svd), axis=0)
+                    stat_feature = np.concatenate((user_stat, serv_stat), axis=0)
+    
+                    node_feature = np.concatenate((csm_feature, svd_feat, stat_feature), axis=1)
+                    handcrafted_features.append(node_feature)
+    
+                    adj_norm = adj_calculation(temp)
+                    adj_norms.append(adj_norm)
+    
+                np.save(output_path.format(f'{dataset}_{percent}_handcrafted_features.npy'), handcrafted_features)
+                np.save(output_path.format(f'{dataset}_{percent}_adj_norm.npy'), adj_norms)
