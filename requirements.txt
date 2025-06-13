@@ -1,0 +1,16 @@
+# Core dependencies
+tensorflow-gpu==2.6.2  # For GPU-accelerated training
+numpy==1.19.5          # Compatible with Python 3.6 and TF 2.6.2
+scikit-learn==0.24.2   # For Isolation Forest and metrics
+networkx==2.5          # For graph-related feature processing
+matplotlib==3.3.4      # For plotting loss curves and visualizations
+pandas==1.1.5          # For data handling
+
+# Progress bar
+tqdm==4.62.3
+
+# Optional (for safety with TF ops)
+protobuf==3.20.3       # Avoids compatibility warnings
+
+# Others
+h5py==3.1.0
