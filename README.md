@@ -5,7 +5,6 @@ multi-source collaborative features paper published in IEEE TNSM 2024.
 
 ## Paper Link
 
-> Add your paper title and link here  
 > **Title**: _TPMCF: Temporal QoS Prediction Using
 Multi-Source Collaborative Features_  
 > **Link**: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=10518168
