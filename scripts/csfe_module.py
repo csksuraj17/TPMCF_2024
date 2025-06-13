@@ -83,7 +83,7 @@ def gcn_train_and_predict(adj, features, labels, num_users, num_servs):
     pred_rt, embedding = model(features, training=False)
     return embedding.numpy(), pred_rt.numpy()
 
-def main(num_users, num_servs, num_time_steps, prev_time_steps, FEATURE_DIR, ADJ_DIR, DATA_DIR, OUT_DIR):
+def t_gcn_training(num_users, num_servs, num_time_steps, prev_time_steps, FEATURE_DIR, ADJ_DIR, DATA_DIR, OUT_DIR):
     total_time = 0
     for t in tqdm(range(prev_time_steps-prev_time_steps, num_time_steps)):
         features = np.load(os.path.join(FEATURE_DIR, f'features_t{t}.npy'))
@@ -101,15 +101,3 @@ def main(num_users, num_servs, num_time_steps, prev_time_steps, FEATURE_DIR, ADJ
         np.save(os.path.join(OUT_DIR, f'gcn_pred_t{t}.npy'), prediction)
 
     print(f"GCN training completed in {total_time:.2f} seconds.")
-
-if __name__ == '__main__':
-    num_users = 142
-    num_servs = 4500
-    prev_time_steps = 8
-    num_time_steps = 64
-    FEATURE_DIR = './data_files/{}'
-    ADJ_DIR = './data_files/{}'
-    DATA_DIR = './data_files/{}'
-    OUT_DIR = './output_files/'
-    os.makedirs(OUT_DIR, exist_ok=True)
-    main(num_users, num_servs, num_time_steps, prev_time_steps, FEATURE_DIR, ADJ_DIR, DATA_DIR, OUT_DIR)
