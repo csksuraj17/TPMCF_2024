@@ -112,7 +112,7 @@ def transformer_predict(model, k, X_pred, data_org, data_org_indicator, outlier_
 
         return pred_transformer
 
-def run_transformer_pipeline(gcn_features, data_train, percent, k=63):
+def train_transformer(gcn_features, data_train, percent, k=63):
     print("Preparing input...")
     start = time.time()
     X_train, Y_train, X_pred = transformer_inputs(gcn_features, data_train[:,:,k])
