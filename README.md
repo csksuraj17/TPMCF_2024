@@ -1,7 +1,7 @@
 # TPMCF 2024
 
 This repository implements a step-by-step framework for temporal QoS prediction Using
-multi-source collaborative features published in IEEE TNSM 2024.
+multi-source collaborative features paper published in IEEE TNSM 2024.
 
 ## Paper Link
 
