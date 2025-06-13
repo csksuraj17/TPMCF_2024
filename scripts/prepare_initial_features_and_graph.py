@@ -134,7 +134,7 @@ def run_feature_generation():
     sparse_path = './sparse_files/{}'  # Sparse .npz files like rt_5_t63.npz
     output_path = './data_files/{}'
     
-    with tf.device('cpu'):
+    with tf.device('gpu'):
         for dataset in datasets:
             for percent in percents:
                 print(f"Working for {dataset}-{percent}%")
