@@ -12,12 +12,12 @@ Multi-Source Collaborative Features_
 
 ## Project Structure
 
-- `data/`: Contains input datasets (RT and TP).
+- `data/`: Put input datasets (RT and TP).
 - `scripts/`: Python scripts for each step in the pipeline.
-- `utils/`: Utility functions for preprocessing and evaluation.
 - `outputs/`: Folder where generated outputs will be saved.
 - `main.py`: Main pipeline to execute all steps.
 - `requirements.txt`: Required dependencies.
+- Dataset Link: https://github.com/wsdream/AMF/tree/master/data/dataset%232
 
 ## Steps in Pipeline
 
