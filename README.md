@@ -44,6 +44,14 @@ Multi-Source Collaborative Features_
 ## How to Run
 
 ```bash
+Step 1:
+git clone https://github.com/csksuraj17/tpmcf_2024.git
+
+Step 2: 
+conda env create -f environment.yml
+conda activate tpmcf_env
+
+Step 3:
 python main.py
 
 ```
