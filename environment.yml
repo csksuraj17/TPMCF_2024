@@ -1,0 +1,21 @@
+name: tpmcf_env
+channels:
+  - defaults
+  - conda-forge
+  - anaconda
+  - nvidia
+dependencies:
+  - python=3.6.9
+  - pip=21.2.4
+  - cudatoolkit=11.2
+  - cudnn=8.1.0
+  - pip:
+      - tensorflow-gpu==2.6.2
+      - numpy==1.19.5
+      - scikit-learn==0.24.2
+      - networkx==2.5
+      - matplotlib==3.3.4
+      - pandas==1.1.5
+      - tqdm==4.62.3
+      - h5py==3.1.0
+      - protobuf==3.20.3
