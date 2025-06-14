@@ -14,6 +14,67 @@ def custom_cauchy(y_true, y_pred):
     loss = tf.math.log(1+tf.square(y_pred - y_true))
     return loss
 
+class MultiHeadSelfAttention(layers.Layer):
+    def __init__(self, embed_dim, num_heads, dropout=0.0):
+        super(MultiHeadSelfAttention, self).__init__()
+        assert embed_dim % num_heads == 0, "Embedding dimension must be divisible by number of heads"
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.proj_dim = embed_dim // num_heads
+        self.dropout = dropout
+
+        # Layers to project inputs to Q, K, V
+        self.query_dense = layers.Dense(embed_dim)
+        self.key_dense = layers.Dense(embed_dim)
+        self.value_dense = layers.Dense(embed_dim)
+
+        # Output projection
+        self.out_dense = layers.Dense(embed_dim)
+
+        # Dropout
+        self.attn_dropout = layers.Dropout(dropout)
+
+    def split_heads(self, x, batch_size):
+        """
+        Split the last dimension into (num_heads, proj_dim).
+        Transpose the result to shape (batch_size, num_heads, seq_len, proj_dim)
+        """
+        x = tf.reshape(x, (batch_size, -1, self.num_heads, self.proj_dim))
+        return tf.transpose(x, perm=[0, 2, 1, 3])
+
+    def call(self, inputs, training=False):
+        # inputs: (batch_size, seq_len, embed_dim)
+        batch_size = tf.shape(inputs)[0]
+
+        # Linear projections
+        query = self.query_dense(inputs)
+        key = self.key_dense(inputs)
+        value = self.value_dense(inputs)
+
+        # Split into heads
+        query = self.split_heads(query, batch_size)
+        key = self.split_heads(key, batch_size)
+        value = self.split_heads(value, batch_size)
+
+        # Scaled dot-product attention
+        score = tf.matmul(query, key, transpose_b=True)  # (B, H, L, L)
+        dk = tf.cast(self.proj_dim, tf.float32)
+        scaled_score = score / tf.math.sqrt(dk)
+        weights = tf.nn.softmax(scaled_score, axis=-1)
+        weights = self.attn_dropout(weights, training=training)
+
+        attention = tf.matmul(weights, value)  # (B, H, L, D/H)
+
+        # Concatenate heads
+        attention = tf.transpose(attention, perm=[0, 2, 1, 3])  # (B, L, H, D/H)
+        concat_attention = tf.reshape(attention, (batch_size, -1, self.embed_dim))
+
+        # Final linear layer
+        output = self.out_dense(concat_attention)  # (B, L, D)
+
+        return output
+
 def transformer_inputs(gcn_feature, train_matrix):
     with tf.device('gpu'):
         user_f, serv_f = tf.split(gcn_feature, [142, 4500], 1)
@@ -39,8 +100,8 @@ def transformer_inputs(gcn_feature, train_matrix):
 
     return X_train, Y_train, X_pred
 
-def transformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
-    attn_output = layers.MultiHeadAttention(key_dim=head_size, num_heads=num_heads, dropout=dropout)(inputs, inputs)
+def transformer_encoder(inputs, mha_layer, head_size, num_heads, ff_dim, dropout=0):
+    attn_output = mha_layer(inputs)
     out1 = layers.LayerNormalization(epsilon=1e-6)(attn_output + inputs)
 
     x = tf.transpose(out1, perm=[0, 2, 1])
@@ -52,10 +113,12 @@ def transformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
     return out2
 
 def build_model(input_shape, head_size, num_heads, ff_dim, num_transformer_blocks, mlp_units, dropout=0, mlp_dropout=0):
-    inputs = keras.Input(shape=input_shape)
     x = inputs
+    inputs = keras.Input(shape=input_shape)
+    mha_layer = MultiHeadSelfAttention(embed_dim=head_size, num_heads=num_heads, dropout=dropout)
+    
     for _ in range(num_transformer_blocks):
-        x = transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
+        x = transformer_encoder(x, mha_layer, head_size, num_heads, ff_dim, dropout)
     x = layers.GlobalMaxPooling1D(data_format="channels_first")(x)
     for dim in mlp_units:
         x = layers.Dense(dim, activation="relu")(x)
