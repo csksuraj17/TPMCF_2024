@@ -33,7 +33,7 @@ def training_matrix_generator(per, data):
     return data
 
 
-def save_sparse_versions(name, full_tensor, output_dir="outputs/sparse", steps=range(5, 55, 5)):
+def save_sparse_versions(name, full_tensor, output_dir="outputs/sparse", steps=range(5, 25, 5)):
     os.makedirs(output_dir, exist_ok=True)
     np.save(os.path.join(output_dir, f"{name}_full.npy"), full_tensor)
     print(f"Saved: {name}_full.npy")
