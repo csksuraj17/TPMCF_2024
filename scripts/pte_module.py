@@ -10,7 +10,7 @@ import os
 from csfe_module import fill_matrix, cal_metric, plot_loss
 
 
-def custom_cauchy(y_true, y_pred):
+def cauchy_loss_fn(y_true, y_pred):
     loss = tf.math.log(1+tf.square(y_pred - y_true))
     return loss
 
@@ -139,7 +139,7 @@ def transformer_predict(model, k, X_pred, data_org, data_org_indicator, outlier_
         return pred_transformer
 
 
-def run_pte(gcn_features, data_train, percent, k, custom_loss_fn, outlier_dict, data_org, data_org_indicator):
+def run_pte(gcn_features, data_train, percent, k, outlier_dict, data_org, data_org_indicator):
     print("Preparing input...")
     start = time.time()
     X_train, Y_train, X_pred = transformer_inputs(gcn_features, data_train[:,:,k])
@@ -153,7 +153,7 @@ def run_pte(gcn_features, data_train, percent, k, custom_loss_fn, outlier_dict, 
     Y_train = np.load(f'./data_files/Y_train_{percent}.npy')
     X_pred = np.load(f'./data_files/X_pred_{percent}.npy')
 
-    model, t_train_time = transformer_train(k, X_train[:, 56:, :], Y_train, custom_loss_fn)
+    model, t_train_time = transformer_train(k, X_train[:, 56:, :], Y_train, cauchy_loss_fn)
 
     pred_matrix, t_pred_time = transformer_predict(
         model, k, X_pred[:, 56:, :],
