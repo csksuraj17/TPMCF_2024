@@ -34,7 +34,7 @@ def run_pipeline():
 
             # Step 1: Sparse Matrix Creation
             logging.info("Step 1: Creating Sparse Matrices...")
-            create_sparse_matrix.generate_sparse_matrices(dataset, percent)
+            data_org, data_org_indicator = create_sparse_matrix.generate_sparse_matrices(dataset, percent)
 
             # Step 2: Outlier Detection
             logging.info("Step 2: Outlier Detection...")
@@ -59,8 +59,8 @@ def run_pipeline():
 
                 data_train = np.load(data_path)
                 gcn_features = np.load(gcn_path, allow_pickle=True)
-
-                pte_module.run_pte(gcn_features, data_train, percent, k=TIMESTAMP_INDEX)
+                
+                pte_module.run_pte(gcn_features, data_train, percent, TIMESTAMP_INDEX, outlier_dict, data_org, data_org_indicator)
               
             except Exception as e:
                 logging.error(f"Transformer step failed for {dataset.upper()} with {int(percent * 100)}% density: {e}")
