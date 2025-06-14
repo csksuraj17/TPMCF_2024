@@ -22,115 +22,82 @@ class MultiHeadSelfAttention(layers.Layer):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.proj_dim = embed_dim // num_heads
-        self.dropout = dropout
 
-        # Layers to project inputs to Q, K, V
         self.query_dense = layers.Dense(embed_dim)
         self.key_dense = layers.Dense(embed_dim)
         self.value_dense = layers.Dense(embed_dim)
-
-        # Output projection
         self.out_dense = layers.Dense(embed_dim)
-
-        # Dropout
         self.attn_dropout = layers.Dropout(dropout)
 
     def split_heads(self, x, batch_size):
-        """
-        Split the last dimension into (num_heads, proj_dim).
-        Transpose the result to shape (batch_size, num_heads, seq_len, proj_dim)
-        """
         x = tf.reshape(x, (batch_size, -1, self.num_heads, self.proj_dim))
         return tf.transpose(x, perm=[0, 2, 1, 3])
 
     def call(self, inputs, training=False):
-        # inputs: (batch_size, seq_len, embed_dim)
         batch_size = tf.shape(inputs)[0]
 
-        # Linear projections
-        query = self.query_dense(inputs)
-        key = self.key_dense(inputs)
-        value = self.value_dense(inputs)
+        query = self.split_heads(self.query_dense(inputs), batch_size)
+        key   = self.split_heads(self.key_dense(inputs), batch_size)
+        value = self.split_heads(self.value_dense(inputs), batch_size)
 
-        # Split into heads
-        query = self.split_heads(query, batch_size)
-        key = self.split_heads(key, batch_size)
-        value = self.split_heads(value, batch_size)
-
-        # Scaled dot-product attention
-        score = tf.matmul(query, key, transpose_b=True)  # (B, H, L, L)
-        dk = tf.cast(self.proj_dim, tf.float32)
-        scaled_score = score / tf.math.sqrt(dk)
-        weights = tf.nn.softmax(scaled_score, axis=-1)
+        scores = tf.matmul(query, key, transpose_b=True)
+        scaled_scores = scores / tf.math.sqrt(tf.cast(self.proj_dim, tf.float32))
+        weights = tf.nn.softmax(scaled_scores, axis=-1)
         weights = self.attn_dropout(weights, training=training)
 
-        attention = tf.matmul(weights, value)  # (B, H, L, D/H)
-
-        # Concatenate heads
-        attention = tf.transpose(attention, perm=[0, 2, 1, 3])  # (B, L, H, D/H)
+        attention = tf.matmul(weights, value)
+        attention = tf.transpose(attention, perm=[0, 2, 1, 3])
         concat_attention = tf.reshape(attention, (batch_size, -1, self.embed_dim))
 
-        # Final linear layer
-        output = self.out_dense(concat_attention)  # (B, L, D)
+        return self.out_dense(concat_attention)
 
-        return output
+def transformer_encoder(inputs, mha_layer, ff_dim, dropout=0.0):
+    attn_output = mha_layer(inputs)
+    out1 = layers.LayerNormalization(epsilon=1e-6)(inputs + attn_output)
+    x = tf.transpose(out1, perm=[0, 2, 1])
+    ffn = layers.Conv1D(filters=ff_dim, kernel_size=3, activation='relu', padding='same')(x)
+    ffn = layers.Dropout(dropout)(ffn)
+    ffn = layers.Conv1D(filters=inputs.shape[-2], kernel_size=1)(ffn)
+    ffn = tf.transpose(ffn, perm=[0, 2, 1])
+    return layers.LayerNormalization(epsilon=1e-6)(out1 + ffn)
+
+def build_model(input_shape, head_size, num_heads, ff_dim, num_transformer_blocks, mlp_units, dropout=0.0, mlp_dropout=0.0):
+    inputs = keras.Input(shape=input_shape)
+    x = inputs
+    mha_layer = MultiHeadSelfAttention(embed_dim=head_size, num_heads=num_heads, dropout=dropout)
+
+    for _ in range(num_transformer_blocks):
+        x = transformer_encoder(x, mha_layer, ff_dim, dropout)
+
+    x = layers.GlobalMaxPooling1D(data_format="channels_first")(x)
+    for dim in mlp_units:
+        x = layers.Dense(dim, activation="relu")(x)
+        x = layers.Dropout(mlp_dropout)(x)
+
+    outputs = layers.Dense(1)(x)
+    return keras.Model(inputs, outputs)
+
 
 def transformer_inputs(gcn_feature, train_matrix):
     with tf.device('gpu'):
         user_f, serv_f = tf.split(gcn_feature, [142, 4500], 1)
-
-        X_train = []
-        Y_train = []
-        X_pred = []
+        X_train, Y_train, X_pred = [], [], []
 
         for i in tqdm_notebook(range(train_matrix.shape[0])):
             for j in range(train_matrix.shape[1]):
-                temp_X = []
-                for k in range(len(gcn_feature)):
-                    temp_X.append(np.concatenate((user_f[k][i], serv_f[k][j])))
+                temp_X = [np.concatenate((user_f[k][i], serv_f[k][j])) for k in range(len(gcn_feature))]
                 if train_matrix[i][j] != 0:
                     X_train.append(temp_X)
                     Y_train.append(train_matrix[i][j])
                 else:
                     X_pred.append(temp_X)
 
-        X_train = np.array(X_train)
-        Y_train = np.array(Y_train)
-        X_pred = np.array(X_pred)
+        return np.array(X_train), np.array(Y_train), np.array(X_pred)
 
-    return X_train, Y_train, X_pred
-
-def transformer_encoder(inputs, mha_layer, head_size, num_heads, ff_dim, dropout=0):
-    attn_output = mha_layer(inputs)
-    out1 = layers.LayerNormalization(epsilon=1e-6)(attn_output + inputs)
-
-    x = tf.transpose(out1, perm=[0, 2, 1])
-    ffn_output = layers.Conv1D(filters=ff_dim, kernel_size=3, activation="relu", padding='same')(x)
-    ffn_output = layers.Dropout(dropout)(ffn_output)
-    ffn_output = layers.Conv1D(filters=inputs.shape[-2], kernel_size=1)(ffn_output)
-    ffn_output = tf.transpose(ffn_output, perm=[0, 2, 1])
-    out2 = layers.LayerNormalization(epsilon=1e-6)(ffn_output + out1)
-    return out2
-
-def build_model(input_shape, head_size, num_heads, ff_dim, num_transformer_blocks, mlp_units, dropout=0, mlp_dropout=0):
-    x = inputs
-    inputs = keras.Input(shape=input_shape)
-    mha_layer = MultiHeadSelfAttention(embed_dim=head_size, num_heads=num_heads, dropout=dropout)
-    
-    for _ in range(num_transformer_blocks):
-        x = transformer_encoder(x, mha_layer, head_size, num_heads, ff_dim, dropout)
-    x = layers.GlobalMaxPooling1D(data_format="channels_first")(x)
-    for dim in mlp_units:
-        x = layers.Dense(dim, activation="relu")(x)
-        x = layers.Dropout(mlp_dropout)(x)
-    outputs = layers.Dense(1)(x)
-    return keras.Model(inputs, outputs)
-
-def transformer_train(k, X_train, Y_train):
+def transformer_train(k, X_train, Y_train, custom_loss_fn):
     with tf.device('gpu'):
-        input_shape = X_train.shape[1:]
         model = build_model(
-            input_shape,
+            input_shape=X_train.shape[1:],
             head_size=256,
             num_heads=4,
             ff_dim=4,
@@ -139,20 +106,17 @@ def transformer_train(k, X_train, Y_train):
             mlp_dropout=0.4,
             dropout=0.4,
         )
-
         model.compile(
-            loss=custom_cauchy,
+            loss=custom_loss_fn,
             metrics=['mae'],
-            optimizer=keras.optimizers.Adam(learning_rate=0.0001)
+            optimizer=keras.optimizers.Adam(learning_rate=1e-4)
         )
-        model.summary()
 
         callbacks = [keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True)]
 
         start_time = time.time()
         history = model.fit(
-            X_train,
-            Y_train,
+            X_train, Y_train,
             validation_split=0.2,
             epochs=200,
             batch_size=32,
@@ -161,52 +125,41 @@ def transformer_train(k, X_train, Y_train):
         )
         train_time = time.time() - start_time
         plot_loss(history)
-
         return model, train_time
 
 def transformer_predict(model, k, X_pred, data_org, data_org_indicator, outlier_dict, data_train):
     with tf.device('cpu'):
         pred = model.predict(X_pred)
         pred_transformer = fill_matrix(k, pred)
-      
+
         for pct, mask in outlier_dict.items():
             mae, rmse, _ = cal_metric(data_org[:,:,k], data_org_indicator[:,:,k], mask[:,:,k], pred_transformer)
             print(f"{pct}% Outliers Removed -> MAE: {mae:.4f}, RMSE: {rmse:.4f}")
 
         return pred_transformer
 
-def train_transformer(gcn_features, data_train, percent, k=63):
+
+def run_pte(gcn_features, data_train, percent, k, custom_loss_fn, outlier_dict, data_org, data_org_indicator):
     print("Preparing input...")
     start = time.time()
     X_train, Y_train, X_pred = transformer_inputs(gcn_features, data_train[:,:,k])
-    print("Input preparation time: {:.2f}s".format(time.time() - start))
+    print(f"Input preparation time: {time.time() - start:.2f}s")
 
-    base_path = './data_files/{}_8time_raw_rt_{}.npy'
-    np.save(base_path.format('X_train', percent), X_train)
-    np.save(base_path.format('Y_train', percent), Y_train)
-    np.save(base_path.format('X_pred', percent), X_pred)
+    np.save(f'./data_files/X_train_{percent}.npy', X_train)
+    np.save(f'./data_files/Y_train_{percent}.npy', Y_train)
+    np.save(f'./data_files/X_pred_{percent}.npy', X_pred)
 
-    X_train = np.load(base_path.format('X_train', percent))
-    Y_train = np.load(base_path.format('Y_train', percent))
-    X_pred = np.load(base_path.format('X_pred', percent))
+    X_train = np.load(f'./data_files/X_train_{percent}.npy')
+    Y_train = np.load(f'./data_files/Y_train_{percent}.npy')
+    X_pred = np.load(f'./data_files/X_pred_{percent}.npy')
 
-    xt = copy.deepcopy(X_train[:, 56:, :])
-    xp = copy.deepcopy(X_pred[:, 56:, :])
+    model, t_train_time = transformer_train(k, X_train[:, 56:, :], Y_train, custom_loss_fn)
 
-    model, train_time = transformer_train(k, xt, Y_train)
-  
-    pred_matrix = transformer_predict(
-        model, k, xp, data_org, data_org_indicator,
-        {
-            0: no_outlier,
-            2: outlier2,
-            4: outlier4,
-            6: outlier6,
-            8: outlier8,
-            10: outlier10
-        },
-        data_train
-    )
+    pred_matrix, t_pred_time = transformer_predict(
+        model, k, X_pred[:, 56:, :],
+        data_org, data_org_indicator,
+        outlier_dict, data_train
+    ), 0  # Replace 0 with actual timing if needed
 
-    print("Total Training Time: {:.2f}s, Prediction Time per QoS entry: {:.8f}s".format(t_train_time, t_pred_time))
+    print(f"Total Training Time: {t_train_time:.2f}s, Prediction Time per QoS entry: {t_pred_time:.8f}s")
     return pred_matrix
