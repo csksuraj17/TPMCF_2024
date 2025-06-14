@@ -60,7 +60,7 @@ def run_pipeline():
                 data_train = np.load(data_path)
                 gcn_features = np.load(gcn_path, allow_pickle=True)
 
-                pte_module.train_transformer(gcn_features, data_train, percent, k=TIMESTAMP_INDEX)
+                pte_module.run_pte(gcn_features, data_train, percent, k=TIMESTAMP_INDEX)
               
             except Exception as e:
                 logging.error(f"Transformer step failed for {dataset.upper()} with {int(percent * 100)}% density: {e}")
