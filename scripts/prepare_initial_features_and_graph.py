@@ -23,14 +23,14 @@ def similarity_feature(csm_data):
     csm_serv = cosine_similarity(csm_data.T)
     return csm_user, csm_serv
 
-def euclidean_dist(euclid_data):
-    u_euclid = euclidean_distances(euclid_data, euclid_data)
-    s_euclid = euclidean_distances(euclid_data.T, euclid_data.T)
-    for mat in [u_euclid, s_euclid]:
-        for i in range(mat.shape[0]):
-            s = mat[i].sum()
-            mat[i] = mat[i] / s if s != 0 else mat[i]
-    return u_euclid, s_euclid
+# def euclidean_dist(euclid_data):
+#     u_euclid = euclidean_distances(euclid_data, euclid_data)
+#     s_euclid = euclidean_distances(euclid_data.T, euclid_data.T)
+#     for mat in [u_euclid, s_euclid]:
+#         for i in range(mat.shape[0]):
+#             s = mat[i].sum()
+#             mat[i] = mat[i] / s if s != 0 else mat[i]
+#     return u_euclid, s_euclid
 
 def svd_feature(svd_data):
     U_svd, sigma, S_svd = svds(svd_data, k=50)
